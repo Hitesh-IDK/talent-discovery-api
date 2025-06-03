@@ -1,0 +1,12 @@
+fastapi==0.115.12
+groq==0.26.0
+instructor==1.8.3
+numpy==2.2.6
+passlib==1.7.4
+pydantic==2.11.5
+pydantic_settings==2.9.1
+pypdf==5.6.0
+python_jose==3.5.0
+sentence_transformers==4.1.0
+SQLAlchemy==2.0.34
+uvicorn==0.34.2
