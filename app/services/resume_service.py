@@ -191,7 +191,7 @@ class ResumeService:
         uploader = db.query(User).filter(User.id == resume.user_id).first()
         if not uploader:
             return None, "Uploader not found"
-        if uploader.role == UserRole.candidate and current_user.id != uploader.id:
+        if current_user.role == UserRole.candidate and current_user.id != uploader.id:
             return None, "Not authorized to access this resume"
         experience = [
             {
