@@ -31,3 +31,37 @@ class UserInDB(UserBase):
     
     class Config:
         from_attributes = True
+
+
+class HROnboardingBase(BaseModel):
+    company_size: str
+    hiring_timeline: str
+    industry_focus: str
+
+
+class HROnboardingCreate(HROnboardingBase):
+    pass
+
+
+class HROnboardingResponse(HROnboardingBase):
+    id: int
+    user_id: int
+    class Config:
+        from_attributes = True
+
+
+class UserOnboardingBase(BaseModel):
+    career_objectives: str
+    role_interest: str
+    years: str
+
+
+class UserOnboardingCreate(UserOnboardingBase):
+    pass
+
+
+class UserOnboardingResponse(UserOnboardingBase):
+    id: int
+    user_id: int
+    class Config:
+        from_attributes = True

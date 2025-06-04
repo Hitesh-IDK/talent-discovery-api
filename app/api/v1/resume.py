@@ -10,6 +10,9 @@ from app.models.resume import ResumeFile, ResumeFileStatus, Resume
 import os
 from uuid import uuid4
 from fastapi.responses import FileResponse
+from app.services.user_service import HROnboardingService
+from app.core.config import settings
+from groq import Groq
 
 router = APIRouter(prefix="/resume", tags=["Resume"])
 
@@ -85,6 +88,20 @@ def nlp_search(
     results = ResumeService.nlp_search(db, english_query)
     return {"results": results}
 
+@router.get("/private", response_model=dict)
+def get_private_resumes(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    resumes = ResumeService.get_resumes_by_user(db, current_user.id)
+    return {"resumes": resumes}
+
+@router.post("/outreach-email", response_model=dict)
+def generate_outreach_email(
+    resume_id: int = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    email = ResumeService.generate_outreach_email(db, resume_id, current_user)
+    return {"email": email}
+
 @router.get("/{resume_id}", response_model=dict)
 def get_resume_by_id(resume_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     resume, error = ResumeService.get_resume_by_id(db, resume_id, current_user)
@@ -95,3 +112,4 @@ def get_resume_by_id(resume_id: int, db: Session = Depends(get_db), current_user
     if error == "Not authorized to access this resume":
         raise HTTPException(status_code=403, detail=error)
     return resume
+

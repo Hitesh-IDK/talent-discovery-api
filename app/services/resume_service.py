@@ -14,6 +14,7 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 from sqlalchemy import LargeBinary
 from app.utils.embedding import embed_text, cosine_similarity
+from app.services.user_service import HROnboardingService
 
 client = Groq(api_key=settings.GROQ_API_KEY)
 client = instructor.from_groq(client)
@@ -159,6 +160,28 @@ class ResumeService:
         ]
 
     @staticmethod
+    def get_resumes_by_user(db: Session, user_id: int):
+        from app.models.resume import Resume
+        resumes = db.query(Resume).filter(Resume.user_id == user_id).all()
+        return [
+            {
+                "id": r.id,
+                "user_id": r.user_id,
+                "name": r.name,
+                "email": r.email,
+                "phone": r.phone,
+                "linkedin": r.linkedin,
+                "github": r.github,
+                "summary": r.summary,
+                "technical_skills": r.technical_skills,
+                "soft_skills": r.soft_skills,
+                "programming_languages": r.programming_languages,
+                "languages": r.languages,
+                "total_experience": r.total_experience
+            } for r in resumes
+        ]
+
+    @staticmethod
     def get_resume_by_id(db: Session, resume_id: int, current_user):
         from app.models.user import User, UserRole
         from app.models.resume import Resume
@@ -264,6 +287,50 @@ class ResumeService:
         # Sort by match percentage, descending
         results.sort(key=lambda x: x["match"], reverse=True)
         return results[:10]  # Return top 10 matches
+
+    @staticmethod
+    def generate_outreach_email(db, resume_id: int, hr_user):
+        from app.models.user import UserRole
+        if hr_user.role != UserRole.hr:
+            raise HTTPException(status_code=403, detail="Not authorized: HR only")
+        # Fetch resume
+        resume, error = ResumeService.get_resume_by_id(db, resume_id, hr_user)
+        if error:
+            raise HTTPException(status_code=404, detail=error)
+        # Fetch HR onboarding
+        hr_onboarding = HROnboardingService.get_onboarding_by_user_id(db, hr_user.id)
+        if not hr_onboarding:
+            raise HTTPException(status_code=404, detail="HR onboarding data not found")
+        # Compose context for Groq
+        prompt = f"""
+You are an HR professional with the following details:
+Name: {hr_user.name}
+Email: {hr_user.email}
+
+Company Profile:
+Company Size: {hr_onboarding.company_size}
+Hiring Timeline: {hr_onboarding.hiring_timeline}
+Industry Focus: {hr_onboarding.industry_focus}
+
+You want to reach out to the following candidate:
+Name: {resume['name']}
+Summary: {resume['summary']}
+Technical Skills: {', '.join(resume['technical_skills'])}
+Programming Languages: {', '.join(resume['programming_languages'])}
+LinkedIn: {resume['linkedin']}
+GitHub: {resume['github']}
+
+Write a professional outreach email introducing yourself and your company, and expressing interest in the candidate based on their resume. Be concise, friendly, and relevant to the candidate's background and your company's focus.
+"""
+        client = Groq(api_key=settings.GROQ_API_KEY)
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=400
+        )
+        email = response.choices[0].message.content.strip()
+        return email
 
 def process_pending_resumes(db: Session):
     pending_files = db.query(ResumeFile).filter(ResumeFile.status == ResumeFileStatus.pending).all()
